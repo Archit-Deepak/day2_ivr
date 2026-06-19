@@ -1,8 +1,30 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
+from sqlalchemy import text
 from app.extensions import db
 from app.models import CallLog
 
 history_bp = Blueprint("history", __name__)
+
+
+@history_bp.route("/api/health", methods=["GET"])
+def health():
+    status = {"redis": "ok", "postgres": "ok"}
+    http_status = 200
+
+    try:
+        rc = current_app.extensions["redis_client"]
+        rc.ping()
+    except Exception as e:
+        status["redis"] = str(e)
+        http_status = 500
+
+    try:
+        db.session.execute(text("SELECT 1"))
+    except Exception as e:
+        status["postgres"] = str(e)
+        http_status = 500
+
+    return jsonify(status), http_status
 
 
 @history_bp.route("/call-history", methods=["GET"])
