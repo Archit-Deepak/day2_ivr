@@ -42,6 +42,16 @@ def _xml_response(xml_string):
     return Response(xml_string, content_type="text/xml")
 
 
+def _speak_then_menu(text, base):
+    # Speak a confirmation, then loop back to the menu so the caller can
+    # try another option without the call ending.
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Speak>{text}</Speak>
+  <Redirect method="POST">{base}/ivr/welcome</Redirect>
+</Response>"""
+
+
 @ivr_bp.route("/welcome", methods=["POST"])
 def welcome():
     base = request.url_root.rstrip("/")
@@ -63,22 +73,26 @@ def handle_input():
 
     retry_key = f"ivr:retries:{call_uuid}"
     rc = current_app.extensions["redis_client"]
+    base = request.url_root.rstrip("/")
 
     if digit == "1":
         _log_call(call_uuid, from_number, to_number, "sales", "completed")
         rc.delete(retry_key)
-        return _xml_response(_speak_xml("Connecting you to Sales. Please hold."))
+        return _xml_response(_speak_then_menu(
+            "Connecting you to Sales. Returning you to the menu.", base))
 
     if digit == "2":
         _log_call(call_uuid, from_number, to_number, "support", "completed")
         rc.delete(retry_key)
-        return _xml_response(_speak_xml("Connecting you to Support. Please hold."))
+        return _xml_response(_speak_then_menu(
+            "Connecting you to Support. Returning you to the menu.", base))
 
     if digit == "3":
         spoken = " ".join(from_number)
         _log_call(call_uuid, from_number, to_number, "readback", "completed")
         rc.delete(retry_key)
-        return _xml_response(_speak_xml(f"Your number is {spoken}."))
+        return _xml_response(_speak_then_menu(
+            f"Your number is {spoken}. Returning you to the menu.", base))
 
     # Invalid input or no input — increment retry counter
     pipe = rc.pipeline()
