@@ -28,9 +28,15 @@ def debug():
 
 @history_bp.route("/api/setup-db", methods=["GET", "POST"])
 def setup_db():
-    # Flask-Migrate can't run on serverless — create the tables on demand.
-    # Hit this once after deploy (or whenever the schema is missing).
+    # Flask-Migrate can't run on serverless — manage tables on demand.
+    # An older Day 2 Alembic migration left a call_logs table with a stale
+    # schema (missing menu_selection), and create_all() won't alter it.
+    # Pass ?reset=1 to drop and recreate from the current models.
     try:
+        if request.args.get("reset") == "1":
+            db.drop_all()
+            db.create_all()
+            return jsonify({"status": "ok", "message": "tables dropped and recreated"}), 200
         db.create_all()
         return jsonify({"status": "ok", "message": "tables created"}), 200
     except Exception as e:
