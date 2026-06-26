@@ -7,6 +7,25 @@ from app.models import CallLog
 history_bp = Blueprint("history", __name__)
 
 
+@history_bp.route("/api/debug", methods=["GET"])
+def debug():
+    from sqlalchemy import inspect
+    info = {}
+    try:
+        uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+        info["db_host"] = uri.split("@")[-1].split("/")[0] if "@" in uri else "(none)"
+        info["tables"] = inspect(db.engine).get_table_names()
+        info["models"] = list(db.metadata.tables.keys())
+    except Exception as e:
+        info["inspect_error"] = f"{type(e).__name__}: {e}"
+    try:
+        CallLog.query.limit(1).all()
+        info["query_call_logs"] = "ok"
+    except Exception as e:
+        info["query_call_logs"] = f"{type(e).__name__}: {e}"
+    return jsonify(info)
+
+
 @history_bp.route("/api/setup-db", methods=["GET", "POST"])
 def setup_db():
     # Flask-Migrate can't run on serverless — create the tables on demand.
