@@ -7,6 +7,17 @@ from app.models import CallLog
 history_bp = Blueprint("history", __name__)
 
 
+@history_bp.route("/api/setup-db", methods=["GET", "POST"])
+def setup_db():
+    # Flask-Migrate can't run on serverless — create the tables on demand.
+    # Hit this once after deploy (or whenever the schema is missing).
+    try:
+        db.create_all()
+        return jsonify({"status": "ok", "message": "tables created"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @history_bp.route("/api/health", methods=["GET"])
 def health():
     result = {"redis": "ok", "postgres": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
